@@ -43,11 +43,6 @@ function Download-FileWithProgress {
             $percentComplete = 0 # or some other indicator, like "?" or "Unknown"
         }
 
-
-        #$progressBarLength = 40  Removed progress bar
-        #$filledLength = [int]($progressBarLength * $percentComplete / 100)  Removed progress bar
-        #$bar = '=' * $filledLength + '-' * ($progressBarLength - $filledLength) Removed progress bar
-
         # Calculate download speed.  Use -gt 0 to avoid /0 error
         $bytesDiff = $bytesTransferred - $previousBytesTransferred
         if ($bytesDiff -gt 0) {
@@ -68,7 +63,7 @@ function Download-FileWithProgress {
             $progressText = "Downloaded: $downloadedMB MB $speedDisplay"  #if total size unknown.
         }
 
-        Write-Host "`r$DisplayName: $percentComplete%   $progressText" -NoNewline # Changed to show percentage directly
+        Write-Host "`r$($DisplayName): $percentComplete%   $progressText" -NoNewline # Corrected variable interpolation
 
         Start-Sleep -Milliseconds 500 # sleep to avoid cpu maxing out
     }
@@ -78,10 +73,10 @@ function Download-FileWithProgress {
     # Check for errors.  This is crucial.
     if ($bitsJob.JobState -eq "Transferred") {
         Complete-BitsTransfer -BitsJob $bitsJob
-        Write-Host "$DisplayName: Download completed successfully." -ForegroundColor Green  # Display success with the file name
+        Write-Host "$($DisplayName): Download completed successfully." -ForegroundColor Green  # Corrected variable interpolation
     } elseif ($bitsJob.JobState -eq "Error" -or $bitsJob.JobState -eq 'TransientError') {
         $errorRecord = $bitsJob.Error
-        Write-Error "$DisplayName: BITS Transfer failed. Error: $($errorRecord.Exception.Message)" # Display error with file name
+        Write-Error "$($DisplayName): BITS Transfer failed. Error: $($errorRecord.Exception.Message)" # Corrected variable interpolation
         # Clean Up the bits job in case of failure
         Remove-BitsTransfer -BitsJob $bitsJob -Confirm:$false
         Write-Host "`nPress Enter to exit..."
@@ -89,7 +84,7 @@ function Download-FileWithProgress {
         exit 1  # Exit with an error code
     } else {  #Handling for other states like "Cancelled".
         Remove-BitsTransfer -BitsJob $bitsJob -Confirm:$false
-        Write-Error "$DisplayName: BITS Transfer was not successful. Job State: $($bitsJob.JobState)" # Display error with file name
+        Write-Error "$($DisplayName): BITS Transfer was not successful. Job State: $($bitsJob.JobState)" # Corrected variable interpolation
         Write-Host "`nPress Enter to exit..."
         Read-Host
         exit 1 #exit on errors.
