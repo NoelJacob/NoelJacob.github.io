@@ -106,7 +106,7 @@ $sebSettingsSource = Join-Path $downloadFolder "SebClientSettings.seb"
 $appDataRoaming = [Environment]::GetFolderPath("ApplicationData")
 $sebSettingsDestination = Join-Path $appDataRoaming "SafeExamBrowser\SebClientSettings.seb"
 
-Write-Host "Copying SebClientSettings.seb..." -ForegroundColor Cyan
+Write-Host "Copying 'SebClientSettings.seb'..." -ForegroundColor Cyan
 
 #Ensure SafeExamBrowser directory exists in AppData\Roaming
 $sebRoamingDir = Join-Path $appDataRoaming "SafeExamBrowser"
