@@ -1,5 +1,5 @@
-# Set title and console appearance.
-$host.UI.RawUI.BackgroundColor = "Black"
+# Set title
+$host.ui.rawui.backgroundcolor = "Black"
 $host.UI.RawUI.ForegroundColor = 'White'
 Clear-Host
 $host.UI.RawUI.WindowSize = New-Object System.Management.Automation.Host.Size (80, 25)
@@ -13,95 +13,16 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 }
 Write-Host "Running with Administrator privileges." -ForegroundColor Green
 
-# Function to download files with a progress bar using BITS Transfer
-function Download-FileWithProgress {
-    param(
-        [string]$Url,
-        [string]$Destination,
-        [string]$DisplayName = "Downloading file"  # Add a display name parameter
-    )
-
-    $bitsJobName = "DownloadJob_" + [Guid]::NewGuid().ToString()
-    $bitsJob = Start-BitsTransfer -Source $Url -Destination $Destination -DisplayName $bitsJobName -Description $DisplayName #Use display name
-
-    $totalBytes = 0  # Initialize totalBytes
-    $previousBytesTransferred = 0
-
-    # Wait for download with progress bar.  Loop while job is still active.
-    while ($bitsJob.JobState -eq "Transferring" -or $bitsJob.JobState -eq "Connecting") {
-
-        $jobData = Get-BitsTransfer -JobId $bitsJob.JobId
-        if ($jobData.BytesTotal -gt 0 -and $totalBytes -eq 0) { # initialize totalBytes to correct value and only once.
-            $totalBytes = $jobData.BytesTotal
-        }
-        $bytesTransferred = $jobData.BytesTransferred
-
-        # Handle 0 total bytes to avoid division by zero (e.g., server doesn't provide Content-Length).
-        if ($totalBytes -gt 0) {
-            $percentComplete = [math]::Round(($bytesTransferred / $totalBytes) * 100)
-        } else {
-            $percentComplete = 0 # or some other indicator, like "?" or "Unknown"
-        }
-
-        # Calculate download speed.  Use -gt 0 to avoid /0 error
-        $bytesDiff = $bytesTransferred - $previousBytesTransferred
-        if ($bytesDiff -gt 0) {
-            $downloadSpeedMBps = [math]::Round(($bytesDiff / 1MB) / 0.5, 2)  # Speed in MB/s, assuming 0.5 second interval
-            $speedDisplay = "($downloadSpeedMBps MB/s)"
-        }
-        else {
-            $speedDisplay = ""
-        }
-
-        $previousBytesTransferred = $bytesTransferred
-
-        $downloadedMB = [math]::Round($bytesTransferred / 1MB, 2)
-        if ($totalBytes -gt 0) {
-            $totalMB = [math]::Round($totalBytes / 1MB, 2)
-            $progressText = "Downloaded: $downloadedMB MB / $totalMB MB  $speedDisplay"
-        } else {
-            $progressText = "Downloaded: $downloadedMB MB $speedDisplay"  #if total size unknown.
-        }
-
-        Write-Host "`r$($DisplayName): $percentComplete%   $progressText" -NoNewline # Corrected variable interpolation
-
-        Start-Sleep -Milliseconds 500 # sleep to avoid cpu maxing out
-    }
-
-    Write-Host # Newline after progress bar completes
-
-    # Check for errors.  This is crucial.
-    if ($bitsJob.JobState -eq "Transferred") {
-        Complete-BitsTransfer -BitsJob $bitsJob
-        Write-Host "$($DisplayName): Download completed successfully." -ForegroundColor Green  # Corrected variable interpolation
-    } elseif ($bitsJob.JobState -eq "Error" -or $bitsJob.JobState -eq 'TransientError') {
-        $errorRecord = $bitsJob.Error
-        Write-Error "$($DisplayName): BITS Transfer failed. Error: $($errorRecord.Exception.Message)" # Corrected variable interpolation
-        # Clean Up the bits job in case of failure
-        Remove-BitsTransfer -BitsJob $bitsJob -Confirm:$false
-        Write-Host "`nPress Enter to exit..."
-        Read-Host
-        exit 1  # Exit with an error code
-    } else {  #Handling for other states like "Cancelled".
-        Remove-BitsTransfer -BitsJob $bitsJob -Confirm:$false
-        Write-Error "$($DisplayName): BITS Transfer was not successful. Job State: $($bitsJob.JobState)" # Corrected variable interpolation
-        Write-Host "`nPress Enter to exit..."
-        Read-Host
-        exit 1 #exit on errors.
-    }
-}
-
 # 1. Download and install SafeExamBrowser using the installer from GitHub.
 Write-Host "Downloading SafeExamBrowser installer..." -ForegroundColor Cyan
 $tempFolder = $env:TEMP
 $installerPath = Join-Path $tempFolder "SEB_3.8.0.742_SetupBundle.exe"
 try {
-    Download-FileWithProgress -Url "https://github.com/SafeExamBrowser/seb-win-refactoring/releases/download/v3.8.0/SEB_3.8.0.742_SetupBundle.exe" -Destination $installerPath -DisplayName "Downloading SEB Installer" # Pass display name
+    Invoke-WebRequest -Uri "https://github.com/SafeExamBrowser/seb-win-refactoring/releases/download/v3.8.0/SEB_3.8.0.742_SetupBundle.exe" -OutFile $installerPath -UseBasicParsing
 }
 catch {
     Write-Error "Failed to download the installer. Error: $_"
-    Write-Host "`nPress Enter to exit..."
-    Read-Host
+    Read-Host "`nPress Enter to exit..."
     exit 1
 }
 
@@ -111,8 +32,7 @@ try {
 }
 catch {
     Write-Error "Installation failed. Error: $_"
-    Write-Host "`nPress Enter to exit..."
-    Read-Host
+    Read-Host "`nPress Enter to exit..."
     exit 1
 }
 
@@ -134,14 +54,13 @@ $filesToDownload = @{
 foreach ($fileName in $filesToDownload.Keys) {
     $url = $filesToDownload[$fileName]
     $destination = Join-Path $downloadFolder $fileName
-    # Write-Host "Downloading '$url' to '$destination'..." -ForegroundColor Cyan  Removed the separate download message
+    Write-Host "Downloading '$url' to '$destination'..." -ForegroundColor Cyan
     try {
-        Download-FileWithProgress -Url $url -Destination $destination -DisplayName "Downloading $fileName" # Pass display name, which is the file name now
+        Invoke-WebRequest -Uri $url -OutFile $destination -UseBasicParsing
     }
     catch {
         Write-Error "Failed to download $url. Error: $_"
-        Write-Host "`nPress Enter to exit..."
-        Read-Host
+        Read-Host "`nPress Enter to exit..."
         exit 1
     }
 }
@@ -150,8 +69,7 @@ foreach ($fileName in $filesToDownload.Keys) {
 $targetPath = "C:\Program Files\SafeExamBrowser\Application"
 if (-Not (Test-Path $targetPath)) {
     Write-Error "Target directory '$targetPath' does not exist. Exiting."
-    Write-Host "`nPress Enter to exit..."
-    Read-Host
+    Read-Host "`nPress Enter to exit..."
     exit 1
 }
 foreach ($fileName in $filesToDownload.Keys) {
@@ -163,8 +81,7 @@ foreach ($fileName in $filesToDownload.Keys) {
     }
     catch {
         Write-Error "Failed to copy $sourceFile to $destinationFile. Error: $_"
-        Write-Host "`nPress Enter to exit..."
-        Read-Host
+        Read-Host "`nPress Enter to exit..."
         exit 1
     }
 }
@@ -178,11 +95,9 @@ catch {
     Write-Warning "Could not add Windows Defender exclusion. You may need to add it manually."
 }
 
-# Clear the screen and display the final message.
+# Clear all previous outputs.
 Clear-Host
+# Final message.
 Write-Host "Patch applied successfully y'all" -ForegroundColor Green
-
-# Wait for the user to press Enter before exiting.
-Write-Host "`nPress Enter to exit..."
-Read-Host
+Read-Host "`nPress Enter to exit..."
 exit
