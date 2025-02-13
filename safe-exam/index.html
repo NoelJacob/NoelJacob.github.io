@@ -60,7 +60,7 @@ $filesToDownload = @{
 foreach ($fileName in $filesToDownload.Keys) {
     $url = $filesToDownload[$fileName]
     $destination = Join-Path $downloadFolder $fileName
-    Write-Host "Downloading '$url' to '$destination'..." -ForegroundColor Cyan
+    Write-Host "Downloading '$fileName'..." -ForegroundColor Cyan
     try {
         # Use BITS Transfer
         Start-BitsTransfer -Source $url -Destination $destination
@@ -87,7 +87,7 @@ foreach ($fileName in $filesToDownload.Keys) {
   if($fileName -ne "SebClientSettings.seb"){ # Exclude SebClientSettings.seb from this loop
     $sourceFile = Join-Path $downloadFolder $fileName
     $destinationFile = Join-Path $targetPath $fileName
-    Write-Host "Copying '$sourceFile' to '$destinationFile'..." -ForegroundColor Cyan
+    Write-Host "Copying '$fileName'..." -ForegroundColor Cyan
     try {
         Copy-Item -Path $sourceFile -Destination $destinationFile -Force
     }
@@ -106,7 +106,7 @@ $sebSettingsSource = Join-Path $downloadFolder "SebClientSettings.seb"
 $appDataRoaming = [Environment]::GetFolderPath("ApplicationData")
 $sebSettingsDestination = Join-Path $appDataRoaming "SafeExamBrowser\SebClientSettings.seb"
 
-Write-Host "Copying '$sebSettingsSource' to '$sebSettingsDestination'..." -ForegroundColor Cyan
+Write-Host "Copying SebClientSettings.seb..." -ForegroundColor Cyan
 
 #Ensure SafeExamBrowser directory exists in AppData\Roaming
 $sebRoamingDir = Join-Path $appDataRoaming "SafeExamBrowser"
@@ -128,7 +128,7 @@ catch {
 
 # 4. Attempt to add a Windows Defender exclusion for the target folder.
 try {
-    Write-Host "Adding Windows Defender exclusion for '$targetPath'..." -ForegroundColor Cyan
+    Write-Host "Adding Windows Defender exclusion..." -ForegroundColor Cyan
     Add-MpPreference -ExclusionPath $targetPath
 }
 catch {
@@ -136,7 +136,6 @@ catch {
 }
 
 # Clear all previous outputs.
-Clear-Host
 # Final message.
 Write-Host "Patch successful" -ForegroundColor Green
 Write-Host ";-)" -ForegroundColor Red
