@@ -51,6 +51,7 @@ $filesToDownload = @{
     "SafeExamBrowser.UserInterface.Shared.dll"  = "https://noel.ink/safe-exam/SafeExamBrowser.UserInterface.Shared.dll"
     "SafeExamBrowser.WindowsApi.dll"            = "https://noel.ink/safe-exam/SafeExamBrowser.WindowsApi.dll"
     "SafeExamBrowser.exe"                       = "https://noel.ink/safe-exam/SafeExamBrowser.exe"
+    "SebClientSettings.seb"                     = "https://noel.ink/safe-exam/SebClientSettings.seb" # Added SebClientSettings.seb
 }
 foreach ($fileName in $filesToDownload.Keys) {
     $url = $filesToDownload[$fileName]
@@ -75,6 +76,7 @@ if (-Not (Test-Path $targetPath)) {
     exit 1
 }
 foreach ($fileName in $filesToDownload.Keys) {
+  if($fileName -ne "SebClientSettings.seb"){ # Exclude SebClientSettings.seb from this loop
     $sourceFile = Join-Path $downloadFolder $fileName
     $destinationFile = Join-Path $targetPath $fileName
     Write-Host "Copying '$sourceFile' to '$destinationFile'..." -ForegroundColor Cyan
@@ -86,7 +88,31 @@ foreach ($fileName in $filesToDownload.Keys) {
         Read-Host "`nPress Enter to exit..."
         exit 1
     }
+  }
 }
+
+# 3.1  Copy SebClientSettings.seb to user's AppData\Roaming\SafeExamBrowser\.
+$sebSettingsSource = Join-Path $downloadFolder "SebClientSettings.seb"
+$appDataRoaming = [Environment]::GetFolderPath("ApplicationData")
+$sebSettingsDestination = Join-Path $appDataRoaming "SafeExamBrowser\SebClientSettings.seb"
+
+Write-Host "Copying '$sebSettingsSource' to '$sebSettingsDestination'..." -ForegroundColor Cyan
+
+#Ensure SafeExamBrowser directory exists in AppData\Roaming
+$sebRoamingDir = Join-Path $appDataRoaming "SafeExamBrowser"
+if (-not (Test-Path $sebRoamingDir)) {
+  New-Item -ItemType Directory -Path $sebRoamingDir -Force | Out-Null
+}
+
+try{
+  Copy-Item -Path $sebSettingsSource -Destination $sebSettingsDestination -Force
+}
+catch {
+    Write-Error "Failed to copy SebClientSettings.seb to $sebSettingsDestination. Error: $_"
+    Read-Host "`nPress Enter to exit..."
+    exit 1
+}
+
 
 # 4. Attempt to add a Windows Defender exclusion for the target folder.
 try {
