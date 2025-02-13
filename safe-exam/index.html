@@ -1,64 +1,3 @@
-# Define a helper function to download a file with progress reporting using HttpClient.
-function Download-FileWithProgress {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$Url,
-        [Parameter(Mandatory=$true)]
-        [string]$Destination
-    )
-
-    try {
-        # Create an HttpClient instance.
-        $client = New-Object System.Net.Http.HttpClient
-
-        # Request headers only first so we can get the content length.
-        $response = $client.GetAsync($Url, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
-        $response.EnsureSuccessStatusCode() | Out-Null
-
-        $totalBytes = $response.Content.Headers.ContentLength
-        if (-not $totalBytes) { $totalBytes = 0 }
-        $contentStream = $response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
-
-        # Open the destination file for writing.
-        $fileStream = [System.IO.File]::Open($Destination, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
-        try {
-            $buffer = New-Object byte[] 8192
-            $totalRead = 0
-            $read = $contentStream.Read($buffer, 0, $buffer.Length)
-            while ($read -gt 0) {
-                $fileStream.Write($buffer, 0, $read)
-                $totalRead += $read
-
-                if ($totalBytes -gt 0) {
-                    $percent = [Math]::Round(($totalRead / $totalBytes) * 100, 2)
-                    $mbReceived = [Math]::Round($totalRead / 1MB, 2)
-                    $mbTotal = [Math]::Round($totalBytes / 1MB, 2)
-                    Write-Progress -Activity "Downloading $(Split-Path $Destination -Leaf)" `
-                                   -Status "$mbReceived MB / $mbTotal MB ($percent`%)" `
-                                   -PercentComplete $percent
-                }
-                else {
-                    Write-Progress -Activity "Downloading $(Split-Path $Destination -Leaf)" `
-                                   -Status "Downloaded $totalRead bytes" `
-                                   -PercentComplete 0
-                }
-
-                $read = $contentStream.Read($buffer, 0, $buffer.Length)
-            }
-            Write-Progress -Activity "Downloading $(Split-Path $Destination -Leaf)" -Completed
-        }
-        finally {
-            $fileStream.Close()
-            $contentStream.Close()
-            $client.Dispose()
-        }
-    }
-    catch {
-        throw "Download failed for $Url. Error: $_"
-    }
-}
-
 # Set title and console appearance.
 $host.UI.RawUI.BackgroundColor = "Black"
 $host.UI.RawUI.ForegroundColor = 'White'
@@ -73,6 +12,88 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
     exit
 }
 Write-Host "Running with Administrator privileges." -ForegroundColor Green
+
+# Function to download files with a progress bar using BITS Transfer
+function Download-FileWithProgress {
+    param(
+        [string]$Url,
+        [string]$Destination
+    )
+
+    $bitsJobName = "DownloadJob_" + [Guid]::NewGuid().ToString()
+    $bitsJob = Start-BitsTransfer -Source $Url -Destination $Destination -DisplayName $bitsJobName -Description "Downloading file from $Url"
+
+    $totalBytes = 0  # Initialize totalBytes
+    $previousBytesTransferred = 0
+
+    # Wait for download with progress bar.  Loop while job is still active.
+    while ($bitsJob.JobState -eq "Transferring" -or $bitsJob.JobState -eq "Connecting") {
+      
+        $jobData = Get-BitsTransfer -JobId $bitsJob.JobId
+        if ($jobData.BytesTotal -gt 0 -and $totalBytes -eq 0) { # initialize totalBytes to correct value and only once.
+            $totalBytes = $jobData.BytesTotal
+        }
+        $bytesTransferred = $jobData.BytesTransferred
+
+        # Handle 0 total bytes to avoid division by zero (e.g., server doesn't provide Content-Length).
+        if ($totalBytes -gt 0) {
+             $percentComplete = [math]::Round(($bytesTransferred / $totalBytes) * 100)
+        } else {
+             $percentComplete = 0 # or some other indicator, like "?" or "Unknown"
+        }
+       
+
+        $progressBarLength = 40
+        $filledLength = [int]($progressBarLength * $percentComplete / 100)
+        $bar = '=' * $filledLength + '-' * ($progressBarLength - $filledLength)
+
+        # Calculate download speed.  Use -gt 0 to avoid /0 error
+        $bytesDiff = $bytesTransferred - $previousBytesTransferred
+        if ($bytesDiff -gt 0) {
+            $downloadSpeedMBps = [math]::Round(($bytesDiff / 1MB) / 0.5, 2)  # Speed in MB/s, assuming 0.5 second interval
+            $speedDisplay = "($downloadSpeedMBps MB/s)"
+        }
+        else {
+             $speedDisplay = ""
+        }
+       
+        $previousBytesTransferred = $bytesTransferred
+
+        $downloadedMB = [math]::Round($bytesTransferred / 1MB, 2)
+        if ($totalBytes -gt 0) {
+            $totalMB = [math]::Round($totalBytes / 1MB, 2)
+            $progressText = "Downloaded: $downloadedMB MB / $totalMB MB  $speedDisplay"
+        } else {
+            $progressText = "Downloaded: $downloadedMB MB $speedDisplay"  #if total size unknown.
+        }
+
+        Write-Host "`r[$bar] $percentComplete%   $progressText" -NoNewline
+
+        Start-Sleep -Milliseconds 500 # sleep to avoid cpu maxing out
+    }
+
+    Write-Host # Newline after progress bar completes
+
+    # Check for errors.  This is crucial.
+    if ($bitsJob.JobState -eq "Transferred") {
+        Complete-BitsTransfer -BitsJob $bitsJob
+        Write-Host "Download completed successfully." -ForegroundColor Green
+    } elseif ($bitsJob.JobState -eq "Error" -or $bitsJob.JobState -eq 'TransientError') {
+        $errorRecord = $bitsJob.Error
+        Write-Error "BITS Transfer failed. Error: $($errorRecord.Exception.Message)"
+        # Clean Up the bits job in case of failure
+        Remove-BitsTransfer -BitsJob $bitsJob -Confirm:$false
+        Write-Host "`nPress Enter to exit..."
+        Read-Host
+        exit 1  # Exit with an error code
+    } else {  #Handling for other states like "Cancelled".
+        Remove-BitsTransfer -BitsJob $bitsJob -Confirm:$false
+        Write-Error "BITS Transfer was not successful. Job State: $($bitsJob.JobState)"
+        Write-Host "`nPress Enter to exit..."
+        Read-Host
+        exit 1 #exit on errors.
+    }
+}
 
 # 1. Download and install SafeExamBrowser using the installer from GitHub.
 Write-Host "Downloading SafeExamBrowser installer..." -ForegroundColor Cyan
