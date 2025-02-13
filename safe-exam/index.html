@@ -18,7 +18,8 @@ Write-Host "Downloading SafeExamBrowser installer..." -ForegroundColor Cyan
 $tempFolder = $env:TEMP
 $installerPath = Join-Path $tempFolder "SEB_3.8.0.742_SetupBundle.exe"
 try {
-    Invoke-WebRequest -Uri "https://github.com/SafeExamBrowser/seb-win-refactoring/releases/download/v3.8.0/SEB_3.8.0.742_SetupBundle.exe" -OutFile $installerPath -UseBasicParsing
+    # Use BITS Transfer
+    Start-BitsTransfer -Source "https://github.com/SafeExamBrowser/seb-win-refactoring/releases/download/v3.8.0/SEB_3.8.0.742_SetupBundle.exe" -Destination $installerPath
 }
 catch {
     Write-Error "Failed to download the installer. Error: $_"
@@ -56,7 +57,8 @@ foreach ($fileName in $filesToDownload.Keys) {
     $destination = Join-Path $downloadFolder $fileName
     Write-Host "Downloading '$url' to '$destination'..." -ForegroundColor Cyan
     try {
-        Invoke-WebRequest -Uri $url -OutFile $destination -UseBasicParsing
+        # Use BITS Transfer
+        Start-BitsTransfer -Source $url -Destination $destination
     }
     catch {
         Write-Error "Failed to download $url. Error: $_"
