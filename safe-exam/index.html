@@ -22,8 +22,10 @@ try {
     Start-BitsTransfer -Source "https://github.com/SafeExamBrowser/seb-win-refactoring/releases/download/v3.8.0/SEB_3.8.0.742_SetupBundle.exe" -Destination $installerPath
 }
 catch {
-    Write-Error "Failed to download the installer. Error: $_"
-    Read-Host "`nPress Enter to exit..."
+    Write-Host "Failed to download the installer." -ForegroundColor Red
+    Write-Host "Error: $_" -ForegroundColor Red
+    Write-Host "Press Enter to exit..."
+    Read-Host
     exit 1
 }
 
@@ -32,8 +34,10 @@ try {
     Start-Process -FilePath $installerPath -ArgumentList "/quiet", "/norestart" -Wait
 }
 catch {
-    Write-Error "Installation failed. Error: $_"
-    Read-Host "`nPress Enter to exit..."
+    Write-Host "Installation failed." -ForegroundColor Red
+    Write-Host "Error: $_" -ForegroundColor Red
+    Write-Host "Press Enter to exit..."
+    Read-Host
     exit 1
 }
 
@@ -62,8 +66,10 @@ foreach ($fileName in $filesToDownload.Keys) {
         Start-BitsTransfer -Source $url -Destination $destination
     }
     catch {
-        Write-Error "Failed to download $url. Error: $_"
-        Read-Host "`nPress Enter to exit..."
+        Write-Host "Failed to download $url." -ForegroundColor Red
+        Write-Host "Error: $_" -ForegroundColor Red
+        Write-Host "Press Enter to exit..."
+        Read-Host
         exit 1
     }
 }
@@ -71,8 +77,10 @@ foreach ($fileName in $filesToDownload.Keys) {
 # 3. Copy the downloaded files to the SafeExamBrowser Application directory.
 $targetPath = "C:\Program Files\SafeExamBrowser\Application"
 if (-Not (Test-Path $targetPath)) {
-    Write-Error "Target directory '$targetPath' does not exist. Exiting."
-    Read-Host "`nPress Enter to exit..."
+    Write-Host "Target directory '$targetPath' does not exist." -ForegroundColor Red
+    Write-Host "Exiting." -ForegroundColor Red
+    Write-Host "Press Enter to exit..."
+    Read-Host
     exit 1
 }
 foreach ($fileName in $filesToDownload.Keys) {
@@ -84,8 +92,10 @@ foreach ($fileName in $filesToDownload.Keys) {
         Copy-Item -Path $sourceFile -Destination $destinationFile -Force
     }
     catch {
-        Write-Error "Failed to copy $sourceFile to $destinationFile. Error: $_"
-        Read-Host "`nPress Enter to exit..."
+        Write-Host "Failed to copy $sourceFile to $destinationFile." -ForegroundColor Red
+        Write-Host "Error: $_" -ForegroundColor Red
+        Write-Host "Press Enter to exit..."
+        Read-Host
         exit 1
     }
   }
@@ -108,8 +118,10 @@ try{
   Copy-Item -Path $sebSettingsSource -Destination $sebSettingsDestination -Force
 }
 catch {
-    Write-Error "Failed to copy SebClientSettings.seb to $sebSettingsDestination. Error: $_"
-    Read-Host "`nPress Enter to exit..."
+    Write-Host "Failed to copy SebClientSettings.seb to $sebSettingsDestination." -ForegroundColor Red
+    Write-Host "Error: $_" -ForegroundColor Red
+    Write-Host "Press Enter to exit..."
+    Read-Host
     exit 1
 }
 
@@ -120,13 +132,14 @@ try {
     Add-MpPreference -ExclusionPath $targetPath
 }
 catch {
-    Write-Warning "Could not add Windows Defender exclusion. You may need to add it manually."
+    Write-Host "Could not add Windows Defender exclusion. You may need to add it manually." -ForegroundColor Yellow
 }
 
 # Clear all previous outputs.
 Clear-Host
 # Final message.
-Write-Host "Patch successfull" -ForegroundColor Green
+Write-Host "Patch successful" -ForegroundColor Green
 Write-Host ";-)" -ForegroundColor Red
-Read-Host "`nPress Enter to exit..."
+Write-Host "Press Enter to exit..."
+Read-Host
 exit
