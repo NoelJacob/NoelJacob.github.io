@@ -2,6 +2,7 @@
     ExampleScript.ps1
     This script demonstrates some basic PowerShell output.
 #>
+$host.UI.RawUI.WindowTitle = "My Custom Title"
 Write-Host "Hello from the remote script!" -ForegroundColor Green
 Write-Host "Current Date and Time: $(Get-Date)" -ForegroundColor Cyan
 # Example: List a few environment variables
