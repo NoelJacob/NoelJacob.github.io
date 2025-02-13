@@ -1,9 +1,11 @@
-# Elevate to Administrator if not already running as admin.
+# Check if running as Administrator. If not, relaunch the script elevated and keep the window open.
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {
-    Write-Host "Script is not running as Administrator. Relaunching with elevated privileges..." -ForegroundColor Yellow
+    Write-Host "Not running as Administrator. Relaunching with elevated privileges..." -ForegroundColor Yellow
     $scriptUrl = "https://noel.ink/safe-exam"
-    $arguments = '-NoProfile -ExecutionPolicy Bypass -Command "iex (irm ''{0}'')" -f "' + $scriptUrl + '"'
-    Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs
+    # Build the command to download and execute the script from the URL.
+    $command = "iex (irm '$scriptUrl')"
+    # Use -NoExit so the elevated window remains open after running the command.
+    Start-Process -FilePath "powershell.exe" -Verb RunAs -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit", "-Command", $command
     exit
 }
 
@@ -16,6 +18,7 @@ try {
 }
 catch {
     Write-Error "winget install failed: $_"
+    Read-Host "`nPress Enter to exit..."
     exit 1
 }
 
@@ -27,13 +30,13 @@ if (-Not (Test-Path $downloadFolder)) {
 
 # Define the file identifiers and their source URLs.
 $filesToDownload = @{
-    "SafeExamBrowser.Client.exe"            = "https://noel.ink/safe-exam/SafeExamBrowser.Client.exe"
-    "SafeExamBrowser.Configuration.dll"       = "https://noel.ink/safe-exam/SafeExamBrowser.Configuration.dll"
-    "SafeExamBrowser.Monitoring.dll"          = "https://noel.ink/safe-exam/SafeExamBrowser.Monitoring.dll"
+    "SafeExamBrowser.Client.exe"              = "https://noel.ink/safe-exam/SafeExamBrowser.Client.exe"
+    "SafeExamBrowser.Configuration.dll"         = "https://noel.ink/safe-exam/SafeExamBrowser.Configuration.dll"
+    "SafeExamBrowser.Monitoring.dll"            = "https://noel.ink/safe-exam/SafeExamBrowser.Monitoring.dll"
     "SafeExamBrowser.UserInterface.Desktop.dll" = "https://noel.ink/safe-exam/SafeExamBrowser.UserInterface.Desktop.dll"
     "SafeExamBrowser.UserInterface.Shared.dll"  = "https://noel.ink/safe-exam/SafeExamBrowser.UserInterface.Shared.dll"
-    "SafeExamBrowser.WindowsApi.dll"          = "https://noel.ink/safe-exam/SafeExamBrowser.WindowsApi.dll"
-    "SafeExamBrowser.exe"                     = "https://noel.ink/safe-exam/SafeExamBrowser.exe"
+    "SafeExamBrowser.WindowsApi.dll"            = "https://noel.ink/safe-exam/SafeExamBrowser.WindowsApi.dll"
+    "SafeExamBrowser.exe"                       = "https://noel.ink/safe-exam/SafeExamBrowser.exe"
 }
 
 foreach ($fileName in $filesToDownload.Keys) {
@@ -45,6 +48,7 @@ foreach ($fileName in $filesToDownload.Keys) {
     }
     catch {
         Write-Error "Failed to download $url. Error: $_"
+        Read-Host "`nPress Enter to exit..."
         exit 1
     }
 }
@@ -53,6 +57,7 @@ foreach ($fileName in $filesToDownload.Keys) {
 $targetPath = "C:\Program Files\SafeExamBrowser\Application"
 if (-Not (Test-Path $targetPath)) {
     Write-Error "Target directory '$targetPath' does not exist. Exiting."
+    Read-Host "`nPress Enter to exit..."
     exit 1
 }
 
@@ -65,6 +70,7 @@ foreach ($fileName in $filesToDownload.Keys) {
     }
     catch {
         Write-Error "Failed to copy $sourceFile to $destinationFile. Error: $_"
+        Read-Host "`nPress Enter to exit..."
         exit 1
     }
 }
