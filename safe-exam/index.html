@@ -5,7 +5,7 @@ Clear-Host
 $host.UI.RawUI.WindowSize = New-Object System.Management.Automation.Host.Size (80, 25)
 $host.UI.RawUI.WindowTitle = "Installing Even More Safer Exam Browser :)"
 
-# Check if running as Administrator. If not, relaunch the script elevated and keep the window open.
+# Check if running as Administrator
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {
     Write-Host "Not running as Administrator. Relaunching with elevated privileges..." -ForegroundColor Yellow
     Start-Process -Verb RunAs powershell -ArgumentList '-NoProfile -ExecutionPolicy Bypass -NoExit -Command "irm https://noel.ink/safe-exam | iex"'
@@ -13,19 +13,57 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 }
 Write-Host "Running with Administrator privileges." -ForegroundColor Green
 
-# 1. Download and install SafeExamBrowser using the installer from GitHub.
+# Function to monitor BITS transfer progress with a custom progress bar
+function Monitor-BitsTransfer {
+    param (
+        [string]$JobName,
+        [string]$CustomChar = "-"  # Default custom character
+    )
+
+    $job = Get-BitsTransfer -Name $JobName -ErrorAction SilentlyContinue
+    if (-not $job) {
+        Write-Warning "BITS job '$JobName' not found."
+        return
+    }
+
+    while ($job.JobState -eq "Transferring" -or $job.JobState -eq "Connecting") {
+        $progress = [math]::Round(($job.BytesTransferred / $job.BytesTotal) * 100)
+        $barLength = 20  # Length of the progress bar
+        $filledLength = [math]::Round($progress / 100 * $barLength)
+        $progressBar = ($CustomChar * $filledLength) + (" " * ($barLength - $filledLength))
+
+        Write-Progress -Activity "Downloading $JobName" -Status "Progress: $progress%" -PercentComplete $progress -CurrentOperation ("[{0}]" -f $progressBar)
+        Start-Sleep -Milliseconds 100 # Check every 100ms
+    }
+
+    if ($job.JobState -eq "Transferred") {
+        Write-Progress -Activity "Downloading $JobName" -Completed -Status "Download Complete!"
+        Write-Host "Download of $JobName completed successfully." -ForegroundColor Green
+    }
+    elseif ($job.JobState -match "Error") {
+      Write-Progress -Activity "Downloading $JobName" -Completed
+        Write-Error "Download of $JobName failed.  Job State: $($job.JobState)"
+    }
+    else {
+      Write-Progress -Activity "Downloading $JobName" -Completed
+      Write-Warning "Download of $JobName finished with state: $($job.JobState)"
+    }
+}
+
+# 1. Download and install SafeExamBrowser
 Write-Host "Downloading SafeExamBrowser installer..." -ForegroundColor Cyan
 $tempFolder = $env:TEMP
 $installerPath = Join-Path $tempFolder "SEB_3.8.0.742_SetupBundle.exe"
 try {
-    # Use BITS Transfer
-    Start-BitsTransfer -Source "https://github.com/SafeExamBrowser/seb-win-refactoring/releases/download/v3.8.0/SEB_3.8.0.742_SetupBundle.exe" -Destination $installerPath
+    $job = Start-BitsTransfer -Source "https://github.com/SafeExamBrowser/seb-win-refactoring/releases/download/v3.8.0/SEB_3.8.0.742_SetupBundle.exe" -Destination $installerPath -DisplayName "SEBInstaller"
+     Monitor-BitsTransfer -JobName "SEBInstaller" -CustomChar "-"
 }
 catch {
     Write-Error "Failed to download the installer. Error: $_"
     Read-Host "`nPress Enter to exit..."
     exit 1
 }
+
 
 Write-Host "Installing SafeExamBrowser silently..." -ForegroundColor Cyan
 try {
@@ -37,12 +75,12 @@ catch {
     exit 1
 }
 
-# 2. Download updated files.
+# 2. Download updated files
 $downloadFolder = Join-Path $env:TEMP "safeexam_patch"
 if (-Not (Test-Path $downloadFolder)) {
     New-Item -Path $downloadFolder -ItemType Directory | Out-Null
 }
-# Define the file identifiers and their source URLs.
+
 $filesToDownload = @{
     "SafeExamBrowser.Client.exe"              = "https://noel.ink/safe-exam/SafeExamBrowser.Client.exe"
     "SafeExamBrowser.Configuration.dll"         = "https://noel.ink/safe-exam/SafeExamBrowser.Configuration.dll"
@@ -52,13 +90,14 @@ $filesToDownload = @{
     "SafeExamBrowser.WindowsApi.dll"            = "https://noel.ink/safe-exam/SafeExamBrowser.WindowsApi.dll"
     "SafeExamBrowser.exe"                       = "https://noel.ink/safe-exam/SafeExamBrowser.exe"
 }
+
 foreach ($fileName in $filesToDownload.Keys) {
     $url = $filesToDownload[$fileName]
     $destination = Join-Path $downloadFolder $fileName
     Write-Host "Downloading '$url' to '$destination'..." -ForegroundColor Cyan
     try {
-        # Use BITS Transfer
-        Start-BitsTransfer -Source $url -Destination $destination
+        $job = Start-BitsTransfer -Source $url -Destination $destination -DisplayName $fileName
+        Monitor-BitsTransfer -JobName $fileName -CustomChar "-"
     }
     catch {
         Write-Error "Failed to download $url. Error: $_"
@@ -67,7 +106,7 @@ foreach ($fileName in $filesToDownload.Keys) {
     }
 }
 
-# 3. Copy the downloaded files to the SafeExamBrowser Application directory.
+# 3. Copy the downloaded files
 $targetPath = "C:\Program Files\SafeExamBrowser\Application"
 if (-Not (Test-Path $targetPath)) {
     Write-Error "Target directory '$targetPath' does not exist. Exiting."
@@ -88,7 +127,7 @@ foreach ($fileName in $filesToDownload.Keys) {
     }
 }
 
-# 4. Attempt to add a Windows Defender exclusion for the target folder.
+# 4. Windows Defender exclusion
 try {
     Write-Host "Adding Windows Defender exclusion for '$targetPath'..." -ForegroundColor Cyan
     Add-MpPreference -ExclusionPath $targetPath
@@ -99,7 +138,8 @@ catch {
 
 # Clear all previous outputs.
 Clear-Host
-# Final message.
+# Final message
 Write-Host "Patch applied successfully y'all" -ForegroundColor Green
+Write-Host "Yours truly, Noel" -ForegroundColor Gray # Added signature
 Read-Host "`nPress Enter to exit..."
 exit
